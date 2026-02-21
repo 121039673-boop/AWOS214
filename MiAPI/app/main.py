@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException, status  
 import asyncio
 from typing import Optional
+from pydantic import BaseModel, Field
 
 # Instancia del servidor
 app = FastAPI(
@@ -15,6 +16,17 @@ usuarios = [
     {"id": 2, "nombre": "Israel", "edad": 21},
     {"id": 3, "nombre": "Sofi", "edad": 21},
 ]
+
+#Modelo de validacion pydantic 
+class usuario_create(BaseModel):
+    id: int = Field(...,gt=0, description="Identificador de ussuario") #tres puntos para obligatorio y gt para ser mayor de cero
+    nombre: str =Field(..., min_length=3,max_length=50,example="Juanita")
+    edad: int = Field(...,ge=1,le=123,description="Edad valida entre 1 y 123")
+#Para que pase la validación minimo debe pasar esos tres parametros 
+
+
+#Los modelos pydantic solo sirven para agregar y actualizar 
+
 
 # Endpoints
 @app.get("/", tags=['inicio'])
@@ -49,6 +61,8 @@ async def consultaTodos(id: Optional[int] = None):
     else:
         return {"mensaje": "No se proporciono id"}
 
+
+
 @app.get("/v1/usuarios/", tags=['CRUD HTTP'])
 async def leer_usuarios():
     return{
@@ -56,12 +70,10 @@ async def leer_usuarios():
         "total": len(usuarios), 
         "usuarios":usuarios
     }
-
-
 @app.post("/v1/usuarios/", tags=['CRUD HTTP'], status_code=status.HTTP_201_CREATED)
-async def crear_usuario(usuario:dict):
+async def crear_usuario(usuario:usuario_create): #llega un usuario ya validado y pasa a ser un modelo
     for usr in usuarios:
-        if usr["id"] == usuario.get("id"):
+        if usr["id"] == usuario.id("id"): #cambio el usuario.get a usuario.id porque ya no es una lista, ya es un modelo 
             raise HTTPException(
                 status_code=400,
                 detail="El id ya existe"
@@ -71,7 +83,7 @@ async def crear_usuario(usuario:dict):
         "mensaje":"Usuario Agregado",
         "Usuario":usuario
     }
-    
+#documentar el redoc 
 
 @app.put("/v1/usuarios/{id}", tags=['CRUD HTTP'])
 async def actualizar_usuario(id: int, usuario: dict):
@@ -82,3 +94,5 @@ async def actualizar_usuario(id: int, usuario: dict):
 
     raise HTTPException(status_code=404, detail="Usuario no encontrado")
       
+ 
+
