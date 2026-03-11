@@ -1,14 +1,47 @@
-from fastapi import FastAPI, HTTPException, status  
+#Importaciones
+from fastapi import FastAPI, status, HTTPException, Depends
 import asyncio
 from typing import Optional
 from pydantic import BaseModel, Field
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
+import secrets
 
 # Instancia del servidor
 app = FastAPI(
-    title="Mi primer API Valeria",
-    description="Valeria Briones Patiño",
-    version="1.0.0"
-)
+    title='Mi primer API ',
+    description='Valeria Briones Patiño',
+    version='1.0.0'
+    )
+
+#TB ficticia
+usuarios = [
+    {"id":1, "nombre" : "Juan", "edad":21},
+    {"id":2, "nombre" : "Israel", "edad":21},
+    {"id":3, "nombre" : "Sofi", "edad":21},
+]
+
+#Modelo de validacion Pydantic
+class usuario_create(BaseModel):
+    id:int = Field(...,gt=0, description="Identificador de usuario")
+    nombre:str = Field(..., min_length=3,max_length=50,example="Juanita")
+    edad:int = Field(..., ge=1, le=123, description="Edad valida entre 1 y 123")
+
+#Seguridad HTTP Basic
+
+security = HTTPBasic()
+
+def verificar_Peticion(credenciales: HTTPBasicCredentials=Depends(security)):
+   userAuth = secrets.compare_digest(credenciales.username, "Valeria Briones")
+   passAuth = secrets.compare_digest(credenciales.password, "2427")
+   
+   if not(userAuth and passAuth):
+      raise HTTPException(
+         status_code= status.HTTP_401_UNAUTHORIZED,
+         detail= "Credenciales no autorizadas"
+      )
+
+   return credenciales.username
+
 
 # TB ficticia
 usuarios = [
@@ -17,7 +50,6 @@ usuarios = [
     {"id": 3, "nombre": "Sofi", "edad": 21},
 ]
 
-#Los modelos pydantic solo sirven para agregar y actualizar 
 #Modelo de validacion pydantic 
 class usuario_create(BaseModel):
     id: int = Field(...,gt=0, description="Identificador de ussuario") #tres puntos para obligatorio y gt para ser mayor de cero
@@ -26,7 +58,7 @@ class usuario_create(BaseModel):
 #Para que pase la validación minimo debe pasar esos tres parametros 
 
 
-
+#Los modelos pydantic solo sirven para agregar y actualizar 
 
 
 # Endpoints
@@ -74,7 +106,7 @@ async def leer_usuarios():
 @app.post("/v1/usuarios/", tags=['CRUD HTTP'], status_code=status.HTTP_201_CREATED)
 async def crear_usuario(usuario:usuario_create): #llega un usuario ya validado y pasa a ser un modelo
     for usr in usuarios:
-        if usr["id"] == usuario.id("id"): #cambio el usuario.get a usuario.id porque ya no es una lista, ya es un modelo 
+        if usr["id"] == usuario.id: #cambio el usuario.get a usuario.id porque ya no es una lista, ya es un modelo 
             raise HTTPException(
                 status_code=400,
                 detail="El id ya existe"
@@ -84,7 +116,7 @@ async def crear_usuario(usuario:usuario_create): #llega un usuario ya validado y
         "mensaje":"Usuario Agregado",
         "Usuario":usuario
     }
- 
+#documentar el redoc 
 
 @app.put("/v1/usuarios/{id}", tags=['CRUD HTTP'])
 async def actualizar_usuario(id: int, usuario: dict):
@@ -95,5 +127,18 @@ async def actualizar_usuario(id: int, usuario: dict):
 
     raise HTTPException(status_code=404, detail="Usuario no encontrado")
       
+      
  
-
+@app.delete("/v1/usuarios/{id}", tags=['CRUD HTTP'])
+async def eliminar_usuario(id: int, userAuth= Depends(verificar_Peticion)):
+    for usuario in usuarios:
+        if usuario["id"] == id:
+            usuarios.remove(usuario)
+            return {
+                "mensaje": f"Usuario eliminado exitosamente {userAuth}",
+                "usuarios_restantes": len(usuarios)
+            }
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND, 
+        detail=f"No se pudo eliminar: El usuario con ID {id} no existe"
+    )
